@@ -42,6 +42,15 @@
 // @grant        window.onurlchange
 // ==/UserScript==
 
+// ave不同范围对应的颜色及字重
+const colorsOfAVE = [
+    // null表示使用默认颜色和字重
+    {min: 0, max: 1, color: null, fontWeight: null}, // 黑色
+    {min: 1, max: 1.5, color: '#00008B', fontWeight: 700}, // 蓝色
+    {min: 1.5, max: 2, color: '#8B4513', fontWeight: 800}, // 棕色
+    {min: 2, max: Infinity, color: '#ff0000', fontWeight: 900} // 红色
+]
+
 function run() {
     var $ = jQuery;
 
@@ -199,7 +208,6 @@ function run() {
      * @param i_T 种子发布时间所在列
      * @param i_S 种子体积所在列
      * @param i_N 做种人数人数所在列
-     * @returns {string}
      */
     function makeA($this, i_T, i_S, i_N) {
         var time = $this.children('td:eq(' + i_T + ')').find("span").attr("title");
@@ -233,18 +241,17 @@ function run() {
         var N = parseInt(number);
         var A = calcA(T, S, N).toFixed(2);
         var ave = (A / S).toFixed(2);
-        if ((A > S * 2) && (N != 0)) {
-            // 标红A大于体积2倍且不断种的种子
-            return '<span style="color:#ff0000;font-weight:900;">' + A + '@' + ave + '</span>'
-        } else if ((A > S * 1.5) && (N != 0)) {
-            // 棕色A大于体积1.5倍
-            return '<span style="color:#8B4513;font-weight:800;">' + A + '@' + ave + '</span>' 
-        } else if ((A > S) && (N != 0)) {
-            // 蓝色A大于体积1倍
-            return '<span style="color:#00008B;font-weight:700;">' + A + '@' + ave + '</span>' 
-        } else {
-            return '<span style="">' + A + '@' + ave + '</span>'
-        }
+
+        var textA = '<span>' + A + '@' + ave + '</span>';
+        colorsOfAVE.forEach(color => {
+            if (ave >= color.min && ave < color.max && (color.color != null || color.fontWeight != null)) {
+                textA = '<span style="'
+                    + (color.color == null ? '' : 'color:' + color.color + ";")
+                    + (color.fontWeight == null ? '' : 'font-weight:' + color.fontWeight + ";")
+                    + '">' + A + '@' + ave + '</span>';
+            }
+        });
+        return textA;
     }
 
 

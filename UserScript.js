@@ -58,7 +58,7 @@ function run() {
         }
     }
     if (isMybonusPage) {
-        
+
         try {
             T0 = parseInt($("li:has(b:contains('T0'))")[1].innerText.split(" = ")[1]);
             N0 = parseInt($("li:has(b:contains('N0'))")[1].innerText.split(" = ")[1]);
@@ -193,6 +193,14 @@ function run() {
         return c1 * S * c2;
     }
 
+    /**
+     *
+     * @param $this 种子的每一行
+     * @param i_T 种子发布时间所在列
+     * @param i_S 种子体积所在列
+     * @param i_N 做种人数人数所在列
+     * @returns {string}
+     */
     function makeA($this, i_T, i_S, i_N) {
         var time = $this.children('td:eq(' + i_T + ')').find("span").attr("title");
         // 适配m-team的发生时间
@@ -207,7 +215,7 @@ function run() {
         var size = $this.children('td:eq(' + i_S + ')').text().trim();
         var size_tp = 1;
         var S = size.replace(/[KMGT]i?B/, function (tp) {
-            if (tp == "KB"|| tp == "KiB") {
+            if (tp == "KB" || tp == "KiB") {
                 size_tp = 1 / 1024 / 1024;
             } else if (tp == "MB" || tp == "MiB") {
                 size_tp = 1 / 1024;
@@ -275,16 +283,18 @@ function run() {
             addFlag = true
             colLen -= 1
         }
-        i_T = colLen - 4
-        i_S = colLen - 3
-        i_N = colLen - 2
+        i_T = colLen - 5
+        i_S = colLen - 4
+        i_N = colLen - 3
         if (!addFlag) {
-            $('div.mt-4>table>thead>tr>th:last').after("<th class=\"border border-solid border-black p-2\" style=\"width: 100px;\" title=\"A值@每GB的A值\"> <div class=\"flex items-center cursor-pointer\"> <div class=\"flex-grow\">A@A/GB</div> </div> </th>");
+            $('div.mt-4>table>thead>tr>th:last').after("<th class=\"border-0 border-b border-solid border-[--mt-line-color] p-2 \" style=\"width: 100px;\" title=\"A值@每GB的A值\"> " +
+                "<div class=\"action\">A@A/GB</div>  </th>");
         }
         $(seedTableSelector).each(function (row) {
             var $this = $(this);
             var textA = makeA($this, i_T, i_S, i_N)
-            let tdTextA = "<td class=\"border border-solid border-black p-2 \" align=\"center\">" + textA + "</td>"
+            let tdTextA = "<td class=\"border-0 border-b border-solid border-[--mt-line-color] p-0 \" align=\"center\">"
+                + textA + "</td>"
             if (addFlag) {
                 $this.children("td:last").html(textA)
             } else {

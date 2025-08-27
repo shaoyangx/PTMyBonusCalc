@@ -45,21 +45,66 @@
 // ave不同范围对应的颜色及字重
 const colorsOfAVE = [
     // null表示使用默认颜色和字重
-    {min: 0, max: 1, color: null, fontWeight: null}, // 黑色
-    {min: 1, max: 1.5, color: '#00008B', fontWeight: 700}, // 蓝色
-    {min: 1.5, max: 2, color: '#8B4513', fontWeight: 800}, // 棕色
-    {min: 2, max: Infinity, color: '#ff0000', fontWeight: 900} // 红色
+    { min: 0, max: 1, color: null, fontWeight: null }, // 黑色
+    { min: 1, max: 1.5, color: '#00008B', fontWeight: 700 }, // 蓝色
+    { min: 1.5, max: 2, color: '#8B4513', fontWeight: 800 }, // 棕色
+    { min: 2, max: Infinity, color: '#ff0000', fontWeight: 900 } // 红色
 ]
+const domainSelectors = [
+    {
+        domain: ["hhanclub.top"],                                    //域名
+        seedTableSelector: 'div[class*="!rounded-lg"] + div tr',     //标题栏选择
+        aValueInsertSelector: 'div[class*="!rounded-lg"] + div',     //魔力值界面选择
+        //listSelector: 'div[class*="!rounded-lg"] + div'            // 列表选择器
+    },
+    {
+        domain: ["azusa.wiki"],                                      
+        aValueInsertSelector: 'table+div',                     
+    },
+    {
+        domain: ["m-team.cc"],
+        seedTableSelector: 'div.mt-4>table>tbody>tr',
+        aValueInsertSelector: 'ul+table'
+    }
+];
+const currentDomain = window.location.hostname;
+let seedTableSelector = null;
+let aValueInsertSelector = null;
+let listSelector = null;
+
+// 先匹配域名，获取对应选择器
+for (const item of domainSelectors) {
+    for (const domainPart of item.domain) {
+        if (currentDomain.includes(domainPart)) {
+            seedTableSelector = item.seedTableSelector;
+            aValueInsertSelector = item.aValueInsertSelector;
+            listSelector = item.listSelector || null;  // 可能没定义，先赋值null
+            break;
+        }
+    }
+    if (seedTableSelector) break;
+}
+// 默认选择器（如果没匹配）
+if (!seedTableSelector) {
+    seedTableSelector = ".torrents:last-of-type>tbody>tr";  //标题栏选择
+}
+if (!aValueInsertSelector) {
+    aValueInsertSelector = "table+h1";  //魔力选择器
+}
+// 如果listSelector为空，则赋值为seedTableSelector
+if (!listSelector) {
+    listSelector = seedTableSelector;
+}
 
 function run() {
     var $ = jQuery;
 
 
     let argsReady = true;
-    let T0 = GM_getValue(host + ".T0");
-    let N0 = GM_getValue(host + ".N0");
-    let B0 = GM_getValue(host + ".B0");
-    let L = GM_getValue(host + ".L");
+    let T0 = GM_getValue(currentDomain + ".T0");
+    let N0 = GM_getValue(currentDomain + ".N0");
+    let B0 = GM_getValue(currentDomain + ".B0");
+    let L = GM_getValue(currentDomain + ".L");
     if (!(T0 && N0 && B0 && L)) {
         argsReady = false
         if (!isMybonusPage) {
@@ -87,10 +132,10 @@ function run() {
                 alert("魔力值参数获取失败,请将Tampermonkey的配置模式修改为高级后手动修改存储配置参数，详见说明文档")
             }
 
-            GM_setValue(host + ".T0", T0);
-            GM_setValue(host + ".N0", N0);
-            GM_setValue(host + ".B0", B0);
-            GM_setValue(host + ".L", L);
+            GM_setValue(currentDomain + ".T0", T0);
+            GM_setValue(currentDomain + ".N0", N0);
+            GM_setValue(currentDomain + ".B0", B0);
+            GM_setValue(currentDomain + ".L", L);
 
         }
 
@@ -109,14 +154,16 @@ function run() {
         }
 
         let A = isMTeam ? 0 : parseFloat($("div:contains(' (A = ')")[0].innerText.split(" = ")[1]);
-        let B = isMTeam ? parseFloat($("td:contains('基本獎勵')+td+td")[0].innerText) : calcB(A);
+        let B = isMTeam ? parseFloat($("td:contains('基本獎勵')+td+td, td:contains('基本奖励')+td+td")[0].innerText) : calcB(A);
+
+
         // 剔除M-Team的基本奖励中做种数奖励
         if (isMTeam) {
-            let matches = $("h5:contains('做種每小時將得到如下的魔力值')").next().children().first().text()
-                .match(/(\d+(\.\d+)?)個魔力值.*最多計(\d+)個/);
+            let matches = $("h5:contains('做種每小時將得到如下的魔力值'), h5:contains('做种每小时将得到如下的魔力值')").next().children().first().text()
+                .match(/(\d+(\.\d+)?)個?魔力值.*最多計?(\d+)個?/);
             let seedingBonusPerSeed = parseFloat(matches[1]);
             let seedingBonusLimit = parseInt(matches[3]);
-            let currentSeedingNode = $("span:contains('當前活動')").parent().clone();
+            let currentSeedingNode = $("span:contains('當前活動'), span:contains('当前活动')").parent().clone();
             currentSeedingNode.find('img').replaceWith(function () {
                 return "img";
             });
@@ -138,10 +185,15 @@ function run() {
             data.push([i, calcB(i)])
         }
 
-        let insertPos = isMTeam ? $("ul+table") : $("table+h1")
-        insertPos.before('<div id="main" style="width: 600px;height:400px; margin:auto;"></div>')
+        // 在选中的元素之前插入div
+        $(aValueInsertSelector).before('<div id="main" style="width: 600px; height: 400px; margin: auto;"></div>');
+
 
         var myChart = echarts.init(document.getElementById('main'));
+        // 计算临界点
+        const alpha = 0.05; // 设定阈值为最大增长速度的10%
+        let A_critical = L * Math.sqrt(1 / alpha - 1);
+        let B_critical = calcB(A_critical);
         // 指定图表的配置项和数据
         var option = {
             title: {
@@ -182,7 +234,15 @@ function run() {
                 {
                     type: 'line',
                     data: [spot],
-                    symbolSize: 6
+                    symbolSize: 8,
+                    itemStyle: { color: 'red' }
+                },
+                {
+                    type: 'scatter',
+                    data: [[A_critical, B_critical]],
+                    symbolSize: 10,
+                    itemStyle: { color: 'orange' },
+                    name: '临界点'
                 }
             ]
         };
@@ -235,7 +295,6 @@ function run() {
             return "";
         });
         S = parseFloat(S) * size_tp;
-        //var number = $this.children('td:eq(' + i_N + ')').text().trim();
         var number = $this.children('td:eq(' + i_N + ')').text().trim().replace(/,/g, ''); // 获取人数，删除多余符号
         //console.log(number);
         var N = parseInt(number);
@@ -254,7 +313,7 @@ function run() {
         return textA;
     }
 
-
+//如果列表选择器和标题选择器相同，则row从0开始，如果不同，则从1开始
     function addDataColGeneral() {
         var i_T, i_S, i_N
         $(seedTableSelector).each(function (row) {
@@ -262,11 +321,11 @@ function run() {
             if (row == 0) {
                 $this.children('td').each(function (col) {
 
-                    if ($(this).find('img.time').length) {
+                    if ($(this).find('img[alt="time"]').length) {
                         i_T = col
-                    } else if ($(this).find('img.size').length) {
+                    } else if ($(this).find('img[alt="size"]').length) {
                         i_S = col
-                    } else if ($(this).find('img.seeders').length) {
+                    } else if ($(this).find('img[alt="seeders"]').length) {
                         i_N = col
                     }
                 })
@@ -360,9 +419,7 @@ function MTteamWaitPageLoadAndRun() {
     }, 100)
 }
 
-let host = window.location.host.match(/\b[^\.]+\.[^\.]+$/)[0]
 let isMTeam = window.location.toString().indexOf("m-team") != -1
-let seedTableSelector = isMTeam ? 'div.mt-4>table>tbody>tr' : '.torrents:last-of-type>tbody>tr'
 let isMybonusPage = window.location.toString().indexOf("mybonus") != -1
 if (window.location.toString().indexOf("tjupt.org") != -1) {
     isMybonusPage = window.location.toString().indexOf("bonus.php") != -1
